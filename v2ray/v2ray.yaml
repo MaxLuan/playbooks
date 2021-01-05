@@ -30,5 +30,12 @@
         state: started
     - name: Ensure proxy are set
       lineinfile: 
-        path: /home/maxluan/.bashrc
-        line: "export https_proxy=socks5://0.0.0.0:8786\nexport http_proxy=socks5://0.0.0.0:8786"
+        path: /etc/environment
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      with_items:
+        - regexp: "^http_proxy="
+          line: "http_proxy=socks5://0.0.0.0:8786"
+        - regexp: "^https_proxy="
+          line: "https_proxy=socks5://0.0.0.0:8786"
