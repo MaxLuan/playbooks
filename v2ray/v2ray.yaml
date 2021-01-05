@@ -1,0 +1,34 @@
+---
+- hosts: all
+  become: true
+  vars:
+    proxy_file: hk.json
+    install_file: install-release.sh
+  
+  tasks:
+    - name: Copy script to server
+      copy:
+        src: "{{ install_file }}"
+        dest: "/tmp/{{ install_file }}"
+
+    - name: Execute the script
+      command: >
+        bash /tmp/{{ install_file }}
+    
+    - name: Make sure v2ray folder exists
+      file:
+        path: /usr/local/etc/v2ray
+        state: directory
+
+    - name: Config v2ray proxy
+      copy: 
+        src: hk.json
+        dest: /usr/local/etc/v2ray/config.json        
+    - name: Enable v2ray
+      service: 
+        name: v2ray
+        state: started
+    - name: Ensure proxy are set
+      lineinfile: 
+        path: /home/maxluan/.bashrc
+        line: "export https_proxy=socks5://0.0.0.0:8786\nexport http_proxy=socks5://0.0.0.0:8786"

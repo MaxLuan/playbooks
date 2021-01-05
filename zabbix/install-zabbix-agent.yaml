@@ -1,0 +1,100 @@
+- name: install zabbix-agent
+  hosts: kubernetes-master:kubernetes-worker
+  vars:
+    zabbix_server: 192.168.31.18
+  tasks:
+    - name: Copy rpm file to server
+      copy:
+         src: zabbix-agent-3.0.9-1.el7.x86_64.rpm
+         dest: /tmp/zabbix-agent-3.0.9-1.el7.x86_64.rpm
+    - name: Install rpm
+      yum:
+         name: /tmp/zabbix-agent-3.0.9-1.el7.x86_64.rpm
+         state: present
+      become: true
+
+    # - name: install zabbix agent
+    #   yum:
+    #     name: zabbix-agent
+    #     state: latest
+    #   become: true
+
+    - name: generate psk
+      shell: sh -c "openssl rand -hex 32 > /etc/zabbix/zabbix_agentd.psk"
+      become: true
+
+    - name: show psk content
+      shell: cat /etc/zabbix/zabbix_agentd.psk
+      register: pskvalue
+      become: true
+
+    - name: print debug value
+      debug:
+        msg: PSK value is {{pskvalue.stdout}}
+
+    - name: specify zabbix server
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^Server='
+        line: Server={{zabbix_server}}
+      become: true
+
+    - name: double check config
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        line: "Server={{zabbix_server}}"
+        state: present
+      check_mode: yes
+    - name: change TLSConnect
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^# TLSConnect=unencrypted'
+        line: 'TLSConnect=psk'
+      become: true
+    - name: change TLSAccept
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^# TLSAccept=unencrypted'
+        line: 'TLSAccept=psk'
+      become: true
+    - name: generate uuid
+      shell: echo "psk `uuidgen`"
+      register: pskname
+
+    - name: change TLSPSKIdentity
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^# TLSPSKIdentity='
+        line: 'TLSPSKIdentity={{pskname.stdout}}'
+      become: true
+    - name: change TLSPSKFile
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^# TLSPSKFile'
+        line: 'TLSPSKFile=/etc/zabbix/zabbix_agentd.psk'
+      become: true
+
+    - name: print debug value
+      debug:
+        msg: PSK name is {{pskname.stdout}}
+    - name: service
+      systemd:
+        name: zabbix-agent
+        state: started
+        enabled: yes
+      become: true
+    - name: firewall
+      shell: firewall-cmd --permanent --zone=public --add-rich-rule='rule family="ipv4" source address="{{zabbix_server}}/32" port protocol="tcp" port="10050" accept'
+      become: true
+
+    - name: reload filewall
+      shell: firewall-cmd --reload
+      become: true
+
+    # handlers
+    - name: clean yum
+      command: yum clean all
+      args:
+        warn: no
+      become: true
+
