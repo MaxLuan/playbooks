@@ -1,0 +1,12 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+          - name: Copy repo file to server
+            copy:
+                    src: CentOS-Base.repo
+                    dest: /etc/yum.repos.d/
+          - name: Make sure can resolve
+            command: >
+                    sed -i -e '/mirrors.cloud.aliyuncs.com/d' -e '/mirrors.aliyuncs.com/d' /etc/yum.repos.d/CentOS-Base.repo
+
